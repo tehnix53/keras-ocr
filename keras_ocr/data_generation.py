@@ -344,8 +344,19 @@ def draw_text_image(text,
                                   if character in subalphabet)) for character in text]
     M = get_rotation_matrix(width=width, height=height, thetaZ=thetaZ, thetaX=thetaX, thetaY=thetaY)
     if permitted_contour is None:
-        permitted_contour = np.array([[0, 0], [width, 0], [width, height],
-                                      [0, height]]).astype('float32')
+        #permitted_contour = np.array([[0, 0], [width, 0], [width, height],
+                                      #[0, height]]).astype('float32')
+
+        # add text to random part of image
+
+        height_up = random.randint(1, int(height / 2))
+        if 1 + height_up + int(height * 0.2) < height:
+            low = 10 + height + int(630 * 0.2)
+        else:
+            low = height
+        permitted_contour = np.array(
+            [[[0, 1 + height_up]], [[width, 1 + height_up]], [[width, low]], [[1, low]]]).astype('float32')
+
     character_sizes = np.array(
         [font.font.getsize(character) for character, font in character_font_pairs])
     min_character_size = character_sizes.sum(axis=1).min()
