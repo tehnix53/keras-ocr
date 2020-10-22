@@ -166,8 +166,8 @@ def getBoxes(y_pred,
              text_threshold=0.4,
              link_threshold=0.4,
              size_threshold=10):
-    if len(y_pred[0]) ==2:
-        y_pred = [np.where(pred[0]>pred[1], pred[0], pred[1]) for pred in y_pred]
+    if len(y_pred) ==2:
+        y_pred = np.where(y_pred[0]>y_pred[1], y_pred[0], y_pred[1])
     box_groups = []
     for y_pred_cur in y_pred:
         # Prepare data
