@@ -73,7 +73,9 @@ def warpBox(image,
             matrix with the image.
     """  
 
-    
+    if cval is None:
+        cval = (0, 0, 0) if len(image.shape) == 3 else 0
+        
     w, h =  box[2][0] - box[0][0], box[2][1] - box[0][1]
     scale = min(target_width / w, target_height / h)
     crop = image[int(box[0][1]):int(box[2][1]),int(box[0][0]):int(box[2][0]) ]
