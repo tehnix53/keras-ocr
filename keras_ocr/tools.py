@@ -58,8 +58,7 @@ def warpBox(image,
             target_width=None,
             margin=0,
             cval=None,
-            return_transform=False,
-            skip_rotate=False):
+            ):
     """Warp a boxed region in an image given by a set of four points into
     a rectangle with a specified width and height. Useful for taking crops
     of distorted or rotated text.
@@ -72,39 +71,8 @@ def warpBox(image,
         target_width: The width of the output rectangle
         return_transform: Whether to return the transformation
             matrix with the image.
-    """
-    if cval is None:
-        cval = (0, 0, 0) if len(image.shape) == 3 else 0
-    if not skip_rotate:
-        box, _ = get_rotated_box(box)
-    w, h = get_rotated_width_height(box)
-    assert (
-        (target_width is None and target_height is None)
-        or (target_width is not None and target_height is not None)), \
-            'Either both or neither of target width and height must be provided.'
-    if target_width is None and target_height is None:
-        target_width = w
-        target_height = h
-    scale = min(target_width / w, target_height / h)
-    M = cv2.getPerspectiveTransform(src=box,
-                                    dst=np.array([[margin, margin], [scale * w - margin, margin],
-                                                  [scale * w - margin, scale * h - margin],
-                                                  [margin, scale * h - margin]]).astype('float32'))
-    crop = cv2.warpPerspective(image, M, dsize=(int(scale * w), int(scale * h)))
-    target_shape = (target_height, target_width, 3) if len(image.shape) == 3 else (target_height,
-                                                                                   target_width)
-    full = (np.zeros(target_shape) + cval).astype('uint8')
-    full[:crop.shape[0], :crop.shape[1]] = crop
-    if return_transform:
-        return full, M
-    return full
+    """  
 
-def simple_crop(image,
-            box,
-            target_height=None,
-            target_width=None,
-            margin=0,
-            cval=None):
     
     w, h =  box[2][0] - box[0][0], box[2][1] - box[0][1]
     scale = min(target_width / w, target_height / h)
