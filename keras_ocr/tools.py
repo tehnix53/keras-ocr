@@ -99,6 +99,23 @@ def warpBox(image,
         return full, M
     return full
 
+def simple_crop(image,
+            box,
+            target_height=None,
+            target_width=None,
+            margin=0,
+            cval=None):
+    
+    w, h =  box[2][0] - box[0][0], box[2][1] - box[0][1]
+    scale = min(target_width / w, target_height / h)
+    crop = image[int(box[0][1]):int(box[2][1]),int(box[0][0]):int(box[2][0]) ]
+    crop = cv2.resize(crop, (int(w*scale), int(h*scale)))
+    target_shape = (target_height, target_width)
+    
+    full = (np.zeros(target_shape) + cval).astype('uint8')
+    full[:crop.shape[0], :crop.shape[1]] = crop
+    return full
+
 
 def flatten(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
