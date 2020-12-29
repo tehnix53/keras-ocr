@@ -8,6 +8,7 @@ import json
 import os
 
 import tqdm
+import tqdm.notebook
 import imgaug
 import PIL.Image
 import numpy as np
