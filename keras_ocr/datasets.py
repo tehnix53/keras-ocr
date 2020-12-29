@@ -458,6 +458,6 @@ def get_DigitsData_recognizer_dataset(dataset_detector):
     dataset = []
     for image_path, lines, _ in dataset_detector:
         for line in lines:
-            box, text = combine_line(line)
+            box, text = tools.combine_line(line)
             dataset.append([image_path, box, text])
     return dataset
