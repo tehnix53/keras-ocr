@@ -12,6 +12,9 @@ import imgaug
 import PIL.Image
 import numpy as np
 
+from xml.etree import ElementTree
+
+
 from . import tools
 
 
@@ -387,3 +390,73 @@ def get_recognizer_image_generator(labels, height, width, alphabet, augmenter=No
         if augmenter:
             image = augmenter.augment_image(image)
         yield (image, text)
+
+
+def get_lableme_detector_dataset(jpg_paths, xml_paths):
+    res = []
+
+    for img_path, path in zip(jpg_paths, xml_paths):
+        tree = ElementTree.parse(path)
+        root = tree.getroot()
+        line = []
+        for n in root.iter('object'):
+            if n[0].text:
+                rank = n[-1].text
+                rank = rank.split('value=')[1].lower()
+            polyg = n[-2]
+
+            coords = []
+            for bbox in polyg[:-1]:
+
+                coords.append([int(float(bbox[0].text)), int(float(bbox[1].text))])
+            line.append([[np.array(coords).astype('float32'), rank]])
+        res.append([img_path, line, 1])
+
+    return res
+
+
+def get_DigitDataset_detector_dataset(main_dir='.',
+                                      skip_illegible=False,
+                                      img_type='.jpg'):
+
+    dataset = []
+    for gt_filepath in tqdm.notebook.tqdm(glob.glob(os.path.join(main_dir, '*.txt'))):
+        image_id = os.path.split(gt_filepath)[1].split('.')[0]
+        image_path = os.path.join(main_dir, image_id + img_type)
+        lines = []
+        with open(gt_filepath, 'r') as f:
+            current_line = []
+            for row in f.read().split('\n'):
+
+                if row == '':
+                    lines.append(current_line)
+                    current_line = []
+                else:
+                    row = row.split(' ')
+                    character = row[-1]
+                    if character == '' and skip_illegible:
+                        continue
+                    res = [_ for _ in map(float, row[-9:-1])]
+
+                    x1, y1, x2, y2 = res[0], res[1], res[4], res[5]
+
+                    current_line.append((np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]]),
+                                         character))
+        # Some lines only have illegible characters and if skip_illegible is True,
+        # then these lines will be blank.
+        lines = [line for line in lines if line]
+        dataset.append((image_path, lines, 1))
+    return dataset
+
+
+def get_DigitsData_recognizer_dataset(dataset_detector):
+    """Get a DigitsData or labelme detector dataset
+    Returns:
+        A recognition dataset as a list of (filepath, box, word) tuples
+    """
+    dataset = []
+    for image_path, lines, _ in dataset_detector:
+        for line in lines:
+            box, text = combine_line(line)
+            dataset.append([image_path, box, text])
+    return dataset
