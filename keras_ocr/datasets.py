@@ -420,6 +420,9 @@ def get_DigitDataset_detector_dataset(main_dir='.',
                                       skip_illegible=False,
                                       img_type='.jpg'):
 
+    change_dict = {'chervi': '♥', 'piki': '♠', 'kresti': '♣', 'bubi': '♦',
+                   'A': 'a', 'J': 'j', 'K': 'k', 'Q': 'q'}
+
     dataset = []
     for gt_filepath in tqdm.notebook.tqdm(glob.glob(os.path.join(main_dir, '*.txt'))):
         image_id = os.path.split(gt_filepath)[1].split('.')[0]
@@ -435,6 +438,11 @@ def get_DigitDataset_detector_dataset(main_dir='.',
                 else:
                     row = row.split(' ')
                     character = row[-1]
+
+                    if character in change_dict.keys():
+
+                        character = change_dict[character]
+
                     if character == '' and skip_illegible:
                         continue
                     res = [_ for _ in map(float, row[-9:-1])]
