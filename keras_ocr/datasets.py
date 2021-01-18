@@ -450,7 +450,7 @@ def get_DigitDataset_detector_dataset(main_dir='.',
                     x1, y1, x2, y2 = res[0], res[1], res[4], res[5]
 
                     current_line.append((np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]]),
-                                         character))
+                                         character.lower()))
         # Some lines only have illegible characters and if skip_illegible is True,
         # then these lines will be blank.
         lines = [line for line in lines if line]
