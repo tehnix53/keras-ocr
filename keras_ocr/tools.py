@@ -648,7 +648,7 @@ class BboxLayer(tf.keras.layers.Layer):
         linkmap = tf.identity(input[0, :, :, 1])
 
         textmap = tf.where(textmap > 0.4, 1.0, 0)
-        linkmap = tf.where(linkmap > 0.4, 1.0, 0)
+        linkmap = tf.where(linkmap > 0.01, 1.0, 0)
         res_img = tf.image.convert_image_dtype(tf.clip_by_value((textmap + linkmap), 0, 1), tf.float32)
 
         filters = tf.ones([3, 3, 1], dtype=tf.dtypes.float32)
