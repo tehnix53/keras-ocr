@@ -214,9 +214,9 @@ def getBoxes(y_pred,
             niter = int(np.sqrt(size * min(w, h) / (w * h)) * 2)
             sx, sy = max(x - niter, 0), max(y - niter, 0)
             ex, ey = min(x + w + niter + 1, img_w), min(y + h + niter + 1, img_h)
-            segmap[sy:ey, sx:ex] = cv2.dilate(
-                segmap[sy:ey, sx:ex],
-                cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter)))
+            #segmap[sy:ey, sx:ex] = cv2.dilate(
+             #   segmap[sy:ey, sx:ex],
+              #  cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter)))
 
             # Make rotated box from contour
             contours = cv2.findContours(segmap.astype('uint8'),
