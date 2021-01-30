@@ -651,10 +651,10 @@ class BboxLayer(tf.keras.layers.Layer):
         linkmap = tf.where(linkmap > 0.01, 1.0, 0)
         res_img = tf.image.convert_image_dtype(tf.clip_by_value((textmap + linkmap), 0, 1), tf.float32)
 
-        filters = tf.ones([10, 10, 1], dtype=tf.dtypes.float32)
+        filters = tf.ones([3, 3, 1], dtype=tf.dtypes.float32)
         strides = [1., 1., 1., 1.]
         padding = "SAME"
-        dilations = [1., 1., 1., 1.]
+        dilations = tf.ones([5,5,1])#[1., 1., 1., 1.]
         res_img = tf.expand_dims(res_img, 0)
         res_img = tf.expand_dims(res_img, -1)
 
