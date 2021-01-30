@@ -223,7 +223,9 @@ def getBoxes(y_pred,
                                         mode=cv2.RETR_TREE,
                                         method=cv2.CHAIN_APPROX_SIMPLE)[-2]
             contour = contours[0]
-            box = cv2.boxPoints(cv2.minAreaRect(contour))
+            #box = cv2.boxPoints(cv2.minAreaRect(contour))
+            box = cv2.boxPoints(cv2.boundingRect(contour))
+
 
             # Check to see if we have a diamond
             w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
