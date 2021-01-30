@@ -223,10 +223,10 @@ def getBoxes(y_pred,
                                         mode=cv2.RETR_TREE,
                                         method=cv2.CHAIN_APPROX_SIMPLE)[-2]
             contour = contours[0]
-            #box = cv2.boxPoints(cv2.minAreaRect(contour))
-            box = cv2.boundingRect(contour)
+            box = cv2.boxPoints(cv2.minAreaRect(contour))
+            #box = cv2.boundingRect(contour)
 
-            '''
+
             # Check to see if we have a diamond
             w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
             box_ratio = max(w, h) / (min(w, h) + 1e-5)
@@ -237,7 +237,7 @@ def getBoxes(y_pred,
             else:
                 # Make clock-wise order
                 box = np.array(np.roll(box, 4 - box.sum(axis=1).argmin(), 0))
-            '''
+
             boxes.append(2 * box)
         box_groups.append(np.array(boxes))
     return box_groups
