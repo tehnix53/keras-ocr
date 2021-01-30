@@ -654,7 +654,7 @@ class BboxLayer(tf.keras.layers.Layer):
         filters = tf.ones([3, 3, 1], dtype=tf.dtypes.float32)
         strides = [1., 1., 1., 1.]
         padding = "SAME"
-        dilations = tf.ones([5,5,1])#[1., 1., 1., 1.]
+        dilations = [1., 4., 4., 1.]
         res_img = tf.expand_dims(res_img, 0)
         res_img = tf.expand_dims(res_img, -1)
 
