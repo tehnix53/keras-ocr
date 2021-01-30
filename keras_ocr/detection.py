@@ -224,7 +224,7 @@ def getBoxes(y_pred,
                                         method=cv2.CHAIN_APPROX_SIMPLE)[-2]
             contour = contours[0]
             #box = cv2.boxPoints(cv2.minAreaRect(contour))
-            box = cv2.boxPoints(cv2.boundingRect(contour))
+            box = cv2.boundingRect(contour)
 
 
             # Check to see if we have a diamond
