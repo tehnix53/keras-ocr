@@ -578,7 +578,26 @@ def resize_crop(image,
 @tf.function
 def get_bboxes(res_img, group_num, shape, margin=0.2, ):  # from connected components image
 
-    mask = tf.where(res_img == group_num, True, False)
+    # add dilation  before bbox calculation
+    one_component = tf.where(res_img == group_num, 1, 0)
+
+    filters = tf.ones([2, 2, 1], dtype=tf.dtypes.int32)
+    strides = [1., 1., 1., 1.]
+    padding = "SAME"
+    dilations = [1., 2., 2., 1.]
+    one_component = tf.expand_dims(one_component, 0)
+    one_component = tf.expand_dims(one_component, -1)
+
+    dlate_component = tf.nn.dilation2d(one_component, filters, strides,
+                                       padding,
+                                       "NHWC",
+                                       dilations)[0, :, :, 0]
+
+    #########
+
+    mask = tf.where(dlate_component == 1, False, True)
+
+
 
     coords_tensor = tf.where(mask)  # get_bboxes(mask)
     coords_tensor = tf.cast(coords_tensor, tf.int32)
@@ -648,9 +667,10 @@ class BboxLayer(tf.keras.layers.Layer):
         linkmap = tf.identity(input[0, :, :, 1])
 
         textmap = tf.where(textmap > 0.4, 1.0, 0)
-        linkmap = tf.where(linkmap > 0.01, 1.0, 0)
+        linkmap = tf.where(linkmap > 0.4, 1.0, 0)
         res_img = tf.image.convert_image_dtype(tf.clip_by_value((textmap + linkmap), 0, 1), tf.float32)
 
+        '''
         filters = tf.ones([3, 3, 1], dtype=tf.dtypes.float32)
         strides = [1., 1., 1., 1.]
         padding = "SAME"
@@ -663,14 +683,14 @@ class BboxLayer(tf.keras.layers.Layer):
                                    "NHWC",
                                    dilations)[0, :, :, 0]
         #####
-
+        '''
         res_img = image_tfa.connected_components(res_img)
         elem_num = tf.reduce_max(res_img)
         self.res = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True,
                                   clear_after_read=False)  # size=elem_num, element_shape=[4,])
 
-        return apply_bbox(res_img, self.res, elem_num, input_shape,
-                          textmap)  # text_img)#self.res.stack()  #tf.convert_to_tensor(self.res)
+        return apply_bbox(res_img, self.res, elem_num+1, input_shape,
+                          textmap=input[0, :, :, 0])  # text_img)#self.res.stack()  #tf.convert_to_tensor(self.res)
 
 
 class GrayScaleLayer(tf.keras.layers.Layer):
