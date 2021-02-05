@@ -552,95 +552,6 @@ def decode_bbox(bboxes, bbox_num, res):
     return res.stack()
 
 
-@tf.function
-def resize_crop(image,
-                box,
-                target_height=31,
-                target_width=200):
-    ## for recognition ##
-
-    crop = tf.image.crop_to_bounding_box(image, box[0], box[1], box[2], box[3])
-    scale = tf.math.minimum(target_width / box[3], target_height / box[2])
-
-    scaled_shape = [tf.cast(box[2], tf.float64) * scale, tf.cast(box[3], tf.float64) * scale]
-    scaled_shape = tf.cast(scaled_shape, tf.int32)
-
-    pad_h = target_height - tf.cast(scaled_shape[0], tf.int32)
-    pad_w = target_width - tf.cast(scaled_shape[1], tf.int32)
-    # paddings = tf.constant([[pad_h,0], [0, pad_w]])
-
-    result_img = tf.image.resize(crop, scaled_shape)[0]
-    result_img = tf.pad(result_img, [[pad_h, 0], [0, pad_w], [0, 0]], "CONSTANT", constant_values=0)
-
-    return result_img
-
-
-@tf.function
-def get_bboxes(res_img, group_num, shape, margin=0.2, ):  # from connected components image
-
-    # add dilation  before bbox calculation
-    one_component = tf.where(res_img == group_num, 1, 0)
-
-    filters = tf.ones([2, 2, 1], dtype=tf.dtypes.int32)
-    strides = [1., 1., 1., 1.]
-    padding = "SAME"
-    dilations = [1., 2., 2., 1.]
-    one_component = tf.expand_dims(one_component, 0)
-    one_component = tf.expand_dims(one_component, -1)
-
-    dlate_component = tf.nn.dilation2d(one_component, filters, strides,
-                                       padding,
-                                       "NHWC",
-                                       dilations)[0, :, :, 0]
-
-    #########
-
-    mask = tf.where(dlate_component == 1, False, True)
-
-
-
-    coords_tensor = tf.where(mask)  # get_bboxes(mask)
-    coords_tensor = tf.cast(coords_tensor, tf.int32)
-
-    y1 = tf.reduce_max(coords_tensor[:, 0])  # + margin
-    # tf.cast(x1, tf.int32)
-
-    y2 = tf.reduce_min(coords_tensor[:, 0])  # - margin
-    # tf.cast(x2, tf.int32)
-
-    x1 = tf.reduce_max(coords_tensor[:, 1])  # + margin
-    # tf.cast(y1, tf.int32)
-    x2 = tf.reduce_min(coords_tensor[:, 1])  # - margin
-    # tf.cast(y2, tf.int32)
-    w = tf.cast(x1 - x2, tf.int32)
-    h = tf.cast(y1 - y2, tf.int32)
-
-    return [y2, x2, h, w]
-
-
-@tf.function
-def apply_bbox(res_img, res, elem_num, shape, textmap, margin=0.3):
-    num = 0  # item number to compensate passed zero elements
-    for i in tf.range(elem_num):
-        bbox = get_bboxes(res_img, i, shape, margin)
-        if bbox[2] > 4 and bbox[3] > 4 and tf.reduce_max(textmap[res_img == i]) > 0.7:  # size and detector treshold
-
-            res = res.write(num, get_bboxes(res_img, i, shape, margin))
-            num += 1
-
-    return res.stack()
-
-
-@tf.function
-def apply_resize_crop(box_number, boxes, crop_results, image):
-    for i in tf.range(box_number):  # inputs_shape[0]
-
-        box = boxes[i]
-
-        crop_results = crop_results.write(i, resize_crop(image, box))
-
-    return crop_results.stack()
-
 
 class ComputeInputLayer(tf.keras.layers.Layer):
 
@@ -654,43 +565,102 @@ class ComputeInputLayer(tf.keras.layers.Layer):
 
 
 class BboxLayer(tf.keras.layers.Layer):
+    # def __init__(self, num_outputs):
     def __init__(self):
+        # for dilation
+
+        self.filters = tf.ones([3, 3, 1], dtype=tf.dtypes.int32)
+        self.strides = [1., 1., 1., 1.]
+        self.padding = "SAME"
+        self.dilations = [1., 2., 2., 1.]
+
         super(BboxLayer, self).__init__()
+        # self.num_outputs = num_outputs
+        # pass
 
     def build(self, input_shape):
         input_shape = tensor_shape.TensorShape(input_shape).as_list()
+
+    def get_bboxes(self, input):
+        # : Tensor where every layer is single dlated connected component area
+
+        coords_tensor = tf.where(input)
+
+        coords_tensor = tf.cast(coords_tensor, tf.int32)
+        y1 = tf.reduce_max(coords_tensor[:, 0])
+        y2 = tf.reduce_min(coords_tensor[:, 0])
+
+        x1 = tf.reduce_max(coords_tensor[:, 1])
+        x2 = tf.reduce_min(coords_tensor[:, 1])
+
+        w = tf.cast(x1 - x2, tf.int32)
+        h = tf.cast(y1 - y2, tf.int32)
+
+        return y2, x2, h, w
+
+    def clear_coords(self, xyhw):
+        # : input - raw list of xyhw tensors
+
+        index = tf.math.logical_and(xyhw[:, 2] < 300, xyhw[:, 2] > 4)
+        return xyhw[index]
 
     def call(self, input):
         input_shape = array_ops.shape(input)
 
         textmap = tf.identity(input[0, :, :, 0])
+        self.textmap = textmap
         linkmap = tf.identity(input[0, :, :, 1])
 
         textmap = tf.where(textmap > 0.4, 1.0, 0)
         linkmap = tf.where(linkmap > 0.4, 1.0, 0)
         res_img = tf.image.convert_image_dtype(tf.clip_by_value((textmap + linkmap), 0, 1), tf.float32)
 
-        '''
-        filters = tf.ones([3, 3, 1], dtype=tf.dtypes.float32)
-        strides = [1., 1., 1., 1.]
-        padding = "SAME"
-        dilations = [1., 1., 1., 1.]
-        res_img = tf.expand_dims(res_img, 0)
-        res_img = tf.expand_dims(res_img, -1)
-
-        res_img = tf.nn.dilation2d(res_img, filters, strides,
-                                   padding,
-                                   "NHWC",
-                                   dilations)[0, :, :, 0]
-        #####
-        '''
         res_img = image_tfa.connected_components(res_img)
-        elem_num = tf.reduce_max(res_img)
-        self.res = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True,
-                                  clear_after_read=False)  # size=elem_num, element_shape=[4,])
+        # self.res_img = res_img
+        elem_num = tf.reduce_max(res_img) + 1
 
-        return apply_bbox(res_img, self.res, elem_num+1, input_shape,
-                          textmap=input[0, :, :, 0])  # text_img)#self.res.stack()  #tf.convert_to_tensor(self.res)
+        # separate connected components to different layers
+        # Transform connected components image to matrix [elem_num x H x W]
+
+        # area_ids_vector = tf.range(elem_num)
+        components_ids_vector = tf.range(elem_num)
+
+        components_ids_matrix = tf.tensordot(components_ids_vector, tf.ones_like(res_img),
+                                             axes=0)  # now every connected components id has its own layer
+
+        # create mask matrix
+        connected_components_img_matrix = tf.tensordot(tf.ones_like(components_ids_vector), res_img,
+                                                       axes=0)  # create [elem_num x H x W] tensor
+
+        connected_components_img_matrix = tf.where(connected_components_img_matrix == components_ids_matrix, 1, 0)
+
+        # dlate every layers mask to increase bbox area
+
+        connected_components_img_matrix = tf.expand_dims(connected_components_img_matrix, -1)
+
+        dlate_component = tf.nn.dilation2d(connected_components_img_matrix,
+                                           self.filters,
+                                           self.strides,
+                                           self.padding,
+
+                                           "NHWC",
+                                           self.dilations)[:, :, :, 0]
+
+        dlate_component = tf.where(dlate_component == 1, False, True)
+
+        # calculate index of dlatet regions where text value < 0.7 and drop them
+        # text_index = tf.map_fn(fn=self.calculate_max_text_value_index, elems=dlate_component)
+
+        # dlate_component = dlate_component[text_index]
+
+        xyhw = tf.map_fn(fn=self.get_bboxes, elems=dlate_component, dtype=(tf.int32, tf.int32, tf.int32, tf.int32))
+
+        # result is [x[0..elem_num], y[0..elem_num],h[0..elem_num], w[0..elem_num] ]. Need Stack and transpose for receive single tensor
+
+        xyhw = tf.stack(xyhw)
+        xyhw = tf.transpose(xyhw)
+
+        return self.clear_coords(xyhw)
 
 
 class GrayScaleLayer(tf.keras.layers.Layer):
@@ -707,18 +677,32 @@ class GrayScaleLayer(tf.keras.layers.Layer):
 
 class CropBboxesLayer(tf.keras.layers.Layer):  # (PreprocessingLayer):
 
+    def resize_crop(self,
+                    box,
+                    target_height=31,
+                    target_width=200):
+        ## for recognition ##
+
+        crop = tf.image.crop_to_bounding_box(self.image, box[0], box[1], box[2], box[3])
+        scale = tf.math.minimum(target_width / box[3], target_height / box[2])
+
+        scaled_shape = [tf.cast(box[2], tf.float64) * scale, tf.cast(box[3], tf.float64) * scale]
+        scaled_shape = tf.cast(scaled_shape, tf.int32)
+        # calculate padding for target w, h
+        pad_h = target_height - tf.cast(scaled_shape[0], tf.int32)
+        pad_w = target_width - tf.cast(scaled_shape[1], tf.int32)
+
+        result_img = tf.image.resize(crop, scaled_shape)[0]
+        result_img = tf.pad(result_img, [[pad_h, 0], [0, pad_w], [0, 0]], "CONSTANT", constant_values=0)
+
+        return result_img  # tf.image.resize(crop, scaled_shape)
+
     def call(self, inputs):
-        inputs_shape = array_ops.shape(inputs[1])
+        # inputs [image, bboxes]
 
-        res = []
-        row_lengths = []
-        crop = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+        self.image = inputs[0]
 
-        return apply_resize_crop(box_number=inputs_shape[0],
-                                 boxes=inputs[1],
-                                 crop_results=crop,
-                                 image=inputs[0])  # crop.stack()
-
+        return tf.map_fn(fn=self.resize_crop, elems=inputs[1], dtype=tf.float32)
 
 class DecodeCharLayer(tf.keras.layers.Layer):
 
@@ -759,7 +743,7 @@ def get_recognition_part(weights, recognizer_alphabet):
     return prediction_model
 
 
-def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, debug=False):
+def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, prod=False):
     # if debug - output bbox images, not rectangles
 
     recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet)
@@ -781,13 +765,13 @@ def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alpha
     bboxes_model = CropBboxesLayer()([grayscale_model, bbox_model])
     bboxes_model = keras.models.Model(inputs=rec_inp, outputs=bboxes_model)
     final_model = recognizer_predict_model(bboxes_model.output)
-    if debug:
-
-        return keras.models.Model(inputs=rec_inp, outputs=[bboxes_model.output, final_model, bbox_model])
+    if prod:
+        # xyhw bbox format
+        return keras.models.Model(inputs=rec_inp, outputs=[bbox_model, final_model, ])
 
     else:
         decoded_bboxes = DecodeBoxLayer()(bbox_model)
-        return keras.models.Model(inputs=rec_inp, outputs=[decoded_bboxes, final_model, ])  # result for prod [[4,2]]
+        return keras.models.Model(inputs=rec_inp, outputs=[decoded_bboxes, final_model, ])  # result for  [[4,2]] bbox shape
 
 
 # create pipeline from one graph model
