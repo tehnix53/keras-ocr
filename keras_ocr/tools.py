@@ -847,7 +847,7 @@ def rect_diagonal(some_array):
     return [[int(some_array[0][0]), int(some_array[0][1])], [int(some_array[2][0]), int(some_array[2][1])]]
 
 
-def ground_true_answer(xml_file):
+def ground_true_answer(xml_file, legacy):
     tree = ElementTree.parse(xml_file)
     root = tree.getroot()
     symbols = ['♠', '♥', '♦️', '♣', '♦', '♥', '♠', '♣', '♠', '♠', '♣', '♣', '♦', '♦']
@@ -859,18 +859,34 @@ def ground_true_answer(xml_file):
     for obj in root.findall('object'):
         for i in obj:
             if i.text == 'cards':
-                suite = (obj.findall('attributes')[0].text).split('=')[1]
-                a = (obj.findall('polygon')[0])
-                coord = []
-                for i in a.findall('pt'):
-                    pair = []
-                    for el in i:
-                        pair += [int(float(el.text))]
-                    coord += [pair]
-                if suite in symbols:
-                    suite_list += [[suite, coord]]
-                elif suite not in symbols:
-                    rang_list += [[suite, coord]]
+                if legacy:
+
+                    suite = (obj.findall('attributes')[0].text).split('=')[1]
+                    a = (obj.findall('polygon')[0])
+                    coord = []
+                    for i in a.findall('pt'):
+                        pair = []
+                        for el in i:
+                            pair += [int(float(el.text))]
+                        coord += [pair]
+                    if suite in symbols:
+                        suite_list += [[suite, coord]]
+                    elif suite not in symbols:
+                        rang_list += [[suite, coord]]
+                else:
+
+                    card = (obj.findall('attributes')[0].text).split('=')[1]
+                    if len(card) > 1:
+                        a = (obj.findall('polygon')[0])
+                        coord = []
+                        for i in a.findall('pt'):
+                            pair = []
+                            for el in i:
+                                pair += [int(float(el.text))]
+                            coord += [pair]
+                        card_list[card] = rect_diagonal(coord)
+
+
 
             elif i.text == 'money':
                 money = (obj.findall('attributes')[0].text).split('=')[1]
@@ -893,7 +909,6 @@ def ground_true_answer(xml_file):
                 card_list[j[0] + i[0]] = [j[1][0], i[1][2]]
 
     return card_list, money_list, other_list
-
 
 def predict_answer(predict):
     card_list = {}
@@ -965,20 +980,21 @@ def other_metrics(other_gt, other_pred):
     return precision, recall
 
 
-def answer_accuracy(ground_true_xml, predict_list, crop, image_file=None, save_dir=None):
-    ground_true_data = ground_true_answer(ground_true_xml)
+def answer_accuracy(ground_true_xml, predict_list,crop,legacy, image_file=None, save_dir=None, ):
+    ground_true_data = ground_true_answer(ground_true_xml, legacy=legacy)
+
     predict_data = predict_answer(predict_list)
     if crop == False:
-        card_accuracy = debug(predict_list, ground_true_data[0], predict_data[0])
+        card_accuracy = debug(predict_list, ground_true_data[0],predict_data[0])
         money_accuracy = debug(predict_list, ground_true_data[1], predict_data[1])
     elif crop == True:
-        card_accuracy = debug(predict_list, ground_true_data[0], predict_data[0], crop, save_dir, image_file)
-        money_accuracy = debug(predict_list, ground_true_data[1], predict_data[1], crop, save_dir, image_file)
+        card_accuracy = debug(predict_list, ground_true_data[0],predict_data[0],crop, save_dir, image_file)
+        money_accuracy = debug(predict_list, ground_true_data[1], predict_data[1], crop,save_dir, image_file)
     other_accuracy = other_metrics(ground_true_data[2], predict_data[2])
     return card_accuracy, money_accuracy, other_accuracy
 
 
-def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug'):
+def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug', legacy=False):
     quality_results = {
         # 'id': [],
         'image_name': [],
@@ -992,7 +1008,7 @@ def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug'):
     # all_res = []
     images_paths.sort()
     xmls_paths.sort()
-    for xml, img in tqdm.notebook.tqdm(zip(xmls_paths, images_paths)):
+    for xml, img in tqdm_notebook(zip(xmls_paths, images_paths)):
 
         #
         # if np.amax(inp) > 1.1:
@@ -1000,16 +1016,16 @@ def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug'):
 
         # predict_list = pipeline.recognize([keras_ocr.tools.read(img)])[0] # for keras pipline
         if one_graph:
-            inp = read(img)  # one graph pipeline
+            inp = keras_ocr.tools.read(img)  # one graph pipeline
             # inp = inp / 255
 
             inp = np.expand_dims(inp, 0)  ## one graph pipeline
             predict_list = pipeline.recognize(inp)[0]  # one graph pipeline
         else:
-            predict_list = pipeline.recognize([read(img)])[0]  # for keras pipline
+            predict_list = pipeline.recognize([keras_ocr.tools.read(img)])[0]  # for keras pipline
 
         try:
-            res = answer_accuracy(xml, predict_list, crop=False, save_dir=save_dir, image_file=img)
+            res = answer_accuracy(xml, predict_list, legacy=False, crop=False, save_dir=save_dir, image_file=img)
             quality_results['image_name'].append(os.path.basename(xml))
             # quality_results['id'].append(n)
             quality_results['card_acc'].append(res[0][0])
