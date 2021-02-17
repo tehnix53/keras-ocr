@@ -1008,7 +1008,7 @@ def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug', 
     # all_res = []
     images_paths.sort()
     xmls_paths.sort()
-    for xml, img in tqdm_notebook(zip(xmls_paths, images_paths)):
+    for xml, img in tqdm.notebook.tqdm(zip(xmls_paths, images_paths)):
 
         #
         # if np.amax(inp) > 1.1:
