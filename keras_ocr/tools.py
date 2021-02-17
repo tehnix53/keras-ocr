@@ -1016,13 +1016,13 @@ def quality_df(images_paths, xmls_paths, pipeline, one_graph, save_dir='debug', 
 
         # predict_list = pipeline.recognize([keras_ocr.tools.read(img)])[0] # for keras pipline
         if one_graph:
-            inp = keras_ocr.tools.read(img)  # one graph pipeline
+            inp = read(img)  # one graph pipeline
             # inp = inp / 255
 
             inp = np.expand_dims(inp, 0)  ## one graph pipeline
             predict_list = pipeline.recognize(inp)[0]  # one graph pipeline
         else:
-            predict_list = pipeline.recognize([keras_ocr.tools.read(img)])[0]  # for keras pipline
+            predict_list = pipeline.recognize([read(img)])[0]  # for keras pipline
 
         try:
             res = answer_accuracy(xml, predict_list, legacy=False, crop=False, save_dir=save_dir, image_file=img)
