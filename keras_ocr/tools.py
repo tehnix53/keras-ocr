@@ -725,7 +725,8 @@ class DecodeBoxLayer(tf.keras.layers.Layer):
 
 
 def get_recognition_part(weights, recognizer_alphabet):
-    backbone, model, training_model, prediction_model = recognition.build_model(recognizer_alphabet,
+    backbone, model, training_model, prediction_model = recognition.build_model(recognizer_alphabet,)
+                                                                                          '''  
                                                                                           height=31,
                                                                                           width=200,
                                                                                           color=False,
@@ -737,6 +738,7 @@ def get_recognition_part(weights, recognizer_alphabet):
                                                                                           rnn_steps_to_discard=2,
                                                                                           pool_size=2,
                                                                                           stn=True, )
+                                                                                          '''
 
     prediction_model.load_weights(weights)
 
