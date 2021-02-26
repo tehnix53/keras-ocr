@@ -724,31 +724,19 @@ class DecodeBoxLayer(tf.keras.layers.Layer):
         return decode_bbox(input, box_num, res)
 
 
-def get_recognition_part(weights, recognizer_alphabet):
-    backbone, model, training_model, prediction_model = recognition.build_model(recognizer_alphabet,)
-                                                                                          '''  
-                                                                                          height=31,
-                                                                                          width=200,
-                                                                                          color=False,
-                                                                                          filters=(
-                                                                                          64, 128, 256, 256, 512, 512,
-                                                                                          512),
-                                                                                          rnn_units=(128, 128),
-                                                                                          dropout=0.25,
-                                                                                          rnn_steps_to_discard=2,
-                                                                                          pool_size=2,
-                                                                                          stn=True, )
-                                                                                          '''
+def get_recognition_part(weights, recognizer_alphabet, build_params):
+    backbone, model, training_model, prediction_model = recognition.build_model(recognizer_alphabet, **build_params)
+
 
     prediction_model.load_weights(weights)
 
     return prediction_model
 
 
-def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, prod=False):
+def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, prod=False, build_params=recognition.DEFAULT_BUILD_PARAMS):
     # if debug - output bbox images, not rectangles
-
-    recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet)
+    # build_params - for recognition part
+    recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet, build_params)
     detector = detection.Detector(weights='clovaai_general')
 
     detector.model.load_weights(detector_weights)
