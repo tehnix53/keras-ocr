@@ -6,6 +6,8 @@ import hashlib
 import urllib.request
 import urllib.parse
 
+from contracts import contract
+
 import cv2
 import imgaug
 import numpy as np
@@ -917,7 +919,98 @@ def count_precision(xml_file, predict_file):
         precision(other, predict_file)
 
 
+from contracts import contract
+
+@contract(pred='list', obj='list', returns = 'str')  
+def got_statistic_word(pred, obj):   
+    
+    "возвращает по заданному объекту (карты, \
+     деньги или прочее)строку, \
+    содержащую все не расознанные или ошибочно\
+    распознанные символы"
+    
+    
+    @contract(g_true='str', predict='str', returns = 'str')          
+    def _compare_words(g_true, predict):
+
+        "находит не распознанные \
+        или ошибочно распознанные символы\
+        в предикте"
+
+        answer = str()
+        for i in g_true:
+            if i not in predict:
+                answer += i
+        return answer
+
+
+    @contract(number_a='int', number_b='int')
+    def _compare_difference(number_a, number_b):
+
+        "сравнивает координаты для\
+        определения наложения точек"
+
+        delta = 10 # погрешность +-
+        max_first = max(number_a,number_b)
+        min_first = min(number_a,number_b)
+        if min_first+delta >=max_first:
+            return True
+        else:
+            return False 
+
+    @contract(a='int', b='int', i='int', j='int')
+    def _compare_coordinate(a,b,i,j):
+
+        "сравнивает 4 координаты диагонали\
+            ректов"
+
+        passed = True    
+        passed &=_compare_difference(a,i)
+        passed &=_compare_difference(b,j)
+
+        return passed    
+    
+    ans = str()
+    for j in pred:  
+        c = j[1]
+        point_pred = list(c[0])    
+        for i in obj:
+            point_true = list(i.values())[0][0]
+            key = list(i.keys())[0]
+            if _compare_coordinate(
+                point_pred[0], point_pred[1],\
+                point_true[0], point_true[1]) == True:
+                ans += (_compare_words(key,j[0]))
+     
+    return ans
+
+@contract(predict='list', xml_file='str', returns='tuple')
+def full_error_statistic(xml_file, predict):
+    
+    "полная статистика по трем объектам"
+    
+    ground_true = got_gt_objects(xml_file)
+    cards = got_statistic_word(predict, ground_true[0])
+    money = got_statistic_word(predict, ground_true[1])
+    other = got_statistic_word(predict, ground_true[2])    
+  
+    return (cards, money, other)
+
+
+@contract(images_paths='list[>0]', xmls_paths='list[>0]')
 def quality_df(images_paths, xmls_paths, pipeline):
+
+    @contract(my_list='list',returns='dict')
+    def _count_frequency(my_list):
+      
+      "подсчитывает число вхождений\
+      символов в список"
+      
+      count = {}
+      for i in my_list:
+          count[i] = count.get(i, 0) + 1
+      return count
+
     quality_results = {    
         'image_name': [],
         'card_acc': [],        
@@ -926,6 +1019,11 @@ def quality_df(images_paths, xmls_paths, pipeline):
     }
     images_paths.sort()
     xmls_paths.sort()
+
+    cards = str()
+    money = str()
+    other = str()
+
     for xml, img in tqdm.notebook.tqdm(zip(xmls_paths, images_paths)):  
         inp = read(img)
         inp = np.expand_dims(inp, 0)
@@ -935,11 +1033,24 @@ def quality_df(images_paths, xmls_paths, pipeline):
             quality_results['image_name'].append(os.path.basename(xml))         
             quality_results['card_acc'].append(res[0])         
             quality_results['money_acc'].append(res[1])       
-            quality_results['other_acc'].append(res[2])       
+            quality_results['other_acc'].append(res[2]) 
+
+            a = full_error_statistic(xml, predict_list)            
+            cards+=a[0]
+            money+=a[1]
+            other+=a[2]
+
         except Exception as e:
             print('empty xml', e)
+
+    cards = _count_frequency(sorted(cards))
+    money = _count_frequency(sorted(money))
+    other = _count_frequency(sorted(other))
+
+    error_statistic = {'cards':cards, 'money':money, 'other':other}
+
     res_df = pd.DataFrame(quality_results)
-    return res_df
+    return res_df, error_statistic
 
 
 
