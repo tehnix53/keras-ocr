@@ -1019,7 +1019,7 @@ def full_error_statistic(xml_file, predict):
     return (cards, money, other)
 
 
-def quality_df(images_paths, xmls_paths, pipeline):
+def quality_df(images_paths, xmls_paths, pipeline, reversed = False):
 
     def _count_frequency(my_list):
       
@@ -1038,7 +1038,10 @@ def quality_df(images_paths, xmls_paths, pipeline):
         'other_acc': [],    
     }
     images_paths.sort()
-    xmls_paths.sort()
+    if reversed == True:
+        xmls_paths.sort(reverse=True)
+    else:
+        xmls_paths.sort()
 
     cards = str()
     money = str()
