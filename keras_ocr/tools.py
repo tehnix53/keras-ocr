@@ -955,8 +955,7 @@ def got_statistic_word(pred, obj):
     содержащую все не расознанные или ошибочно\
     распознанные символы"    
     
-       
-    def _compare_words(g_true, predict):
+   def _compare_words(g_true, predict):
 
         "находит не распознанные \
         или ошибочно распознанные символы\
@@ -967,9 +966,8 @@ def got_statistic_word(pred, obj):
             if i not in predict:
                 answer += i
         return answer
-
-
-     def _compare_difference(number_a, number_b):
+    
+   def _compare_difference(number_a, number_b):
 
         "сравнивает координаты для\
         определения наложения точек"
@@ -982,7 +980,7 @@ def got_statistic_word(pred, obj):
         else:
             return False 
 
-    def _compare_coordinate(a,b,i,j):
+   def _compare_coordinate(a,b,i,j):
 
         "сравнивает 4 координаты диагонали\
             ректов"
