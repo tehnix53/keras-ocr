@@ -905,7 +905,7 @@ def precision(gt_object, predict, money_mode=False):
         else:
             return False   
     
-    predict = predict[0]
+    # predict = predict[0]
     correct_answer = 0
     for i in gt_object:# итерация по ключам из хмл 
         key = list(i)[0]
