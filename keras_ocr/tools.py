@@ -1022,7 +1022,6 @@ def full_error_statistic(xml_file, predict):
 
 def quality_df(images_paths, xmls_paths, pipeline):
 
-    @contract(my_list='list',returns='dict')
     def _count_frequency(my_list):
       
       "подсчитывает число вхождений\
