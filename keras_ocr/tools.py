@@ -6,7 +6,6 @@ import hashlib
 import urllib.request
 import urllib.parse
 
-from contracts import contract
 
 import cv2
 import imgaug
@@ -869,7 +868,25 @@ def got_gt_objects(xml_file):
     other = objects_bb(xml_file,'other')
     return [cards,money,other]
 
-def precision(gt_object, predict):
+
+def convert_money(money_str):  
+    "затирает окончания денег и сравнивает предикты с\
+    граунд тру по абсолютному значению"
+    
+    
+    money_str = money_str.replace(',','.')
+    end_money = ['p','P','$']
+    cut = []
+    for i in range(len(money_str)):
+        if money_str[i] in end_money:
+            cut+=[i]
+    if len(cut) == 0:
+        return money_str
+    else:
+        return money_str[:cut[0]]
+
+
+def precision(gt_object, predict, money_mode=False):
     
     "возвращает точность как отношения длинны\
     предсказаний, которые удовлетворяют условию \
@@ -888,15 +905,25 @@ def precision(gt_object, predict):
         else:
             return False   
     
-    #predict = predict[0]
+    predict = predict[0]
     correct_answer = 0
-    for i in gt_object:# итерация по ключам из хмл        
+    for i in gt_object:# итерация по ключам из хмл 
         key = list(i)[0]
+        if money_mode == True:
+            gt_val = convert_money(key)
+        else:    
+            gt_val = key
+            
         true_coord = i[key]
         first_true = true_coord[0]
         second_true = true_coord[1]    
         for i in range(len(predict)):
-            if predict[i][0] == key:
+            if money_mode == True:
+                predict_val = convert_money(predict[i][0])
+            else:
+                predict_val = predict[i][0]
+            
+            if predict_val == gt_val:
                 predict_coord = predict[i][1]
                 first_predict = predict_coord[0]
                 second_predict = predict_coord[2]             
@@ -915,22 +942,20 @@ def count_precision(xml_file, predict_file):
     other = gt_obj[2]
   
     return precision(cards, predict_file), \
-        precision(money, predict_file), \
+        precision(money, predict_file, money_mode = True), \
         precision(other, predict_file)
 
 
-from contracts import contract
 
-@contract(pred='list', obj='list', returns = 'str')  
+  
 def got_statistic_word(pred, obj):   
     
     "возвращает по заданному объекту (карты, \
      деньги или прочее)строку, \
     содержащую все не расознанные или ошибочно\
-    распознанные символы"
+    распознанные символы"    
     
-    
-    @contract(g_true='str', predict='str', returns = 'str')          
+       
     def _compare_words(g_true, predict):
 
         "находит не распознанные \
@@ -944,8 +969,7 @@ def got_statistic_word(pred, obj):
         return answer
 
 
-    @contract(number_a='int', number_b='int')
-    def _compare_difference(number_a, number_b):
+     def _compare_difference(number_a, number_b):
 
         "сравнивает координаты для\
         определения наложения точек"
@@ -958,7 +982,6 @@ def got_statistic_word(pred, obj):
         else:
             return False 
 
-    @contract(a='int', b='int', i='int', j='int')
     def _compare_coordinate(a,b,i,j):
 
         "сравнивает 4 координаты диагонали\
@@ -984,7 +1007,7 @@ def got_statistic_word(pred, obj):
      
     return ans
 
-@contract(predict='list', xml_file='str', returns='tuple')
+
 def full_error_statistic(xml_file, predict):
     
     "полная статистика по трем объектам"
@@ -997,7 +1020,6 @@ def full_error_statistic(xml_file, predict):
     return (cards, money, other)
 
 
-@contract(images_paths='list[>0]', xmls_paths='list[>0]')
 def quality_df(images_paths, xmls_paths, pipeline):
 
     @contract(my_list='list',returns='dict')
