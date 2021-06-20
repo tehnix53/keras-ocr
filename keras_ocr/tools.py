@@ -727,39 +727,33 @@ class DecodeBoxLayer(tf.keras.layers.Layer):
 
 def get_recognition_part(weights, recognizer_alphabet, build_params):
     backbone, model, training_model, prediction_model = recognition.build_model(recognizer_alphabet, **build_params)
-
-
     prediction_model.load_weights(weights)
+    return prediction_model, model # return list, in create_graph_pipeline change to indexes - index == model_m
 
-    return prediction_model
 
-
-def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, prod=False, build_params=recognition.DEFAULT_BUILD_PARAMS):
+def create_one_grap_model(detector_weights, recognizer_weights, recognizer_alphabet, model_mode=1,
+                          prod=False, build_params=recognition.DEFAULT_BUILD_PARAMS):
     # if debug - output bbox images, not rectangles
     # build_params - for recognition part
-    recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet, build_params)
+    if model_mode == 0: # from get_recognition_part return prediction_model
+      recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet, build_params)[0]
+    elif model_mode == 1: # from get_recognition_part return just model
+      recognizer_predict_model = get_recognition_part(recognizer_weights, recognizer_alphabet, build_params)[1]
+
     detector = detection.Detector(weights='clovaai_general')
-
     detector.model.load_weights(detector_weights)
-
     rec_inp = tf.keras.Input([None, None, 3])
     normilized_inp = ComputeInputLayer()(rec_inp)
-
     bbox_model = detector.model(normilized_inp)
-
     bbox_model = BboxLayer()(bbox_model)
-
     grayscale_model = GrayScaleLayer()(rec_inp)
-
     rec_model_func = tf.keras.models.Model(inputs=rec_inp, outputs=[bbox_model, grayscale_model])
-
     bboxes_model = CropBboxesLayer()([grayscale_model, bbox_model])
     bboxes_model = keras.models.Model(inputs=rec_inp, outputs=bboxes_model)
     final_model = recognizer_predict_model(bboxes_model.output)
     if prod:
         # xyhw bbox format
         return keras.models.Model(inputs=rec_inp, outputs=[bbox_model, final_model, ])
-
     else:
         decoded_bboxes = DecodeBoxLayer()(bbox_model)
         return keras.models.Model(inputs=rec_inp, outputs=[decoded_bboxes, final_model, ])  # result for  [[4,2]] bbox shape
@@ -805,6 +799,51 @@ class OneGraphPipeline():
         char_groups = self.decode_prediction(raw_predict[1])
 
         return self.get_prediction_groups(raw_predict[0], char_groups)
+
+    def _max_val_index(self,array):  
+
+      # to calc max prob index from array
+
+      max_val = np.amax(array)
+      count = 0
+      for n,i in enumerate(array):
+        if i == max_val:
+          count = n
+          break
+      return count 
+
+    def _convert_to_chargroup(self, probability_array):
+
+      # convert array with prob to list with index letter and number prob list
+
+      raw = []
+      probability_list = []
+      for i in probability_array:  
+        subraw = []
+        probability = 1
+        for j in i:     
+          index = self._max_val_index(j)
+          subraw += [index]
+          probability *= j[index]
+        raw+=[subraw]
+        probability_list+=[probability]
+      raw = np.array(raw)
+
+      return raw, probability_list
+
+    def _get_triple_prediction_groups(self, bboxes, char_groups, probability):
+      return [list(zip(predictions, boxes, probability)) for predictions, boxes,\
+              probability in zip([char_groups], [bboxes], [probability])]
+
+    def recognize_with_probability(self, images):
+        # predict
+        raw_predict = self.model.predict([images])
+        # convert to char groups and probability
+        indexes, probability_groups = self._convert_to_chargroup(raw_predict[1])
+        char_groups = self.decode_prediction(indexes)
+        # make triple prediction groups
+        return self._get_triple_prediction_groups(raw_predict[0], char_groups, probability_groups)
+
 
 
 def initialize_image_ops():
